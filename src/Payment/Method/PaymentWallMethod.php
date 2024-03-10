@@ -56,6 +56,11 @@ class PaymentWallMethod extends PaymentMethod
 
         return redirect()->away($widget->getUrl());
     }
+    
+    public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip)
+    {
+        return $this->startPayment($cart, $amount, $currency);
+    }
 
     public function notification(Request $request, ?string $paymentId)
     {

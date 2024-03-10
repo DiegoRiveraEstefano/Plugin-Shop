@@ -5,10 +5,14 @@ namespace Azuriom\Plugin\Shop\Payment\Method;
 use Azuriom\Plugin\Shop\Cart\Cart;
 use Azuriom\Plugin\Shop\Models\Payment;
 use Azuriom\Plugin\Shop\Payment\PaymentMethod;
-use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class DlocalMethod extends PaymentMethod
 {
@@ -24,50 +28,123 @@ class DlocalMethod extends PaymentMethod
      *
      * @var string
      */
-    protected $name = 'DLocalGo';
+    protected $name = 'DLocalGo'; 
 
-    public function startPayment(Cart $cart, float $amount, string $currency)
+    public function startPaymentWithCountry(Cart $cart, float $amount, string $currency, string $countryInput)
     {
-
-        print("a");
-
         $successUrl = route('shop.payments.success', $this->id);
         $failureUrl = route('shop.payments.failure', $this->id);
         $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
-
-        print("b");
-
         $payment = $this->createPayment($cart, $amount, $currency);
 
-        print("c");
+        $formatedCountry = explode(":", $countryInput);
 
-        $response = $this->prepareRequest()->post('', [
-            'order_id' => $payment->id,
-            'amount' => $amount,
-            'currency' => $currency,
-            'country' => 'CL',
-            'notification_url' => $notificationUrl,
-            "success_url" => $successUrl,
-            "back_url" => "https://mc.zgaming.net/shop/profile"
-        ]);
+        $country = $formatedCountry[0];
+        $currencySelected = $formatedCountry[1];
 
-        print("d");
-        print($response);
+        $conversionAmount = Http::withHeaders([ 
+            'Authorization'=> 'Token  8f134e6ad7c0f5d0d4906fc304d46ca930dce35b', 
+        ]) 
+        ->get("http://209.222.97.223:27029/exchange/USD-{$currencySelected}"); 
+
+        $ratio = $conversionAmount->json()["ratio"];
+
+        $apiKey = $this->gateway->data["api_key"];
+        $secretKey = $this->gateway->data["secret_key"];
+
+        $format_token = "{$apiKey}:{$secretKey}";
+
+        $url = "https://api-sbx.dlocalgo.com/v1/payments/";
+
+        $response = Http::withHeaders([
+            'Content-Type'=> 'application/json', 
+            'Authorization'=> "Bearer ${format_token}"
+        ])->post($url, [
+                'order_id' => $payment->id,
+                'amount' => $amount * $ratio,
+                'currency' => $currencySelected,
+                'country' => $country,
+                'notification_url' => $notificationUrl,
+                "success_url" => $successUrl,
+                "back_url" => "https://mc.zgaming.net/shop/profile"
+            ]);
+            
+        print($response->body());
 
         return redirect()->away($response["redirect_url"]);
     }
 
-    private function prepareRequest(): PendingRequestss
+    public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip)
     {
+        $successUrl = route('shop.payments.success', $this->id);
+        $failureUrl = route('shop.payments.failure', $this->id);
+        $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
+        $payment = $this->createPayment($cart, $amount, $currency);
 
-        echo(a1);
-        #$domain = $this->gateway->data['environment'] === 'production' ? 'api' : 'apitest';
+        $locationResponse = Http::withUrlParameters([
+            'endpoint' => 'https://api.iplocation.net',
+            'ip' => $ip
+        ])->get('{+endpoint}?ip={ip}');
+
+        print($locationResponse->body());
+        $location = $locationResponse->json()["country_code2"];
+        if ($location === "-"){
+            $location = "CL";
+        }
+
+        $apiKey = $this->gateway->data["api_key"];
+        $secretKey = $this->gateway->data["secret_key"];
+
+        $format_token = "{$apiKey}:{$secretKey}";
+
         $url = "https://api-sbx.dlocalgo.com/v1/payments/";
-        $token = base64_encode($this->gateway->data['api_key'] . ':' . $this->gateway->data['secrete_key']  );
 
-        echo($url);
-        echo($token);
-        return Http::withToken($token, 'Bearer')->baseUrl($url);
+        $response = Http::withHeaders([
+            'Content-Type'=> 'application/json', 
+            'Authorization'=> "Bearer ${format_token}"
+        ])->post($url, [
+                'order_id' => $payment->id,
+                'amount' => $amount,
+                'currency' => $currency,
+                'country' => "BR",
+                'notification_url' => $notificationUrl,
+                "success_url" => $successUrl,
+                "back_url" => "https://mc.zgaming.net/shop/profile"
+            ]);
+            
+        print($response->body());
+
+        return redirect()->away($response["redirect_url"]);
+    }
+
+    public function startPayment(Cart $cart, float $amount, string $currency)
+    {
+        $successUrl = route('shop.payments.success', $this->id);
+        $failureUrl = route('shop.payments.failure', $this->id);
+        $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
+        $payment = $this->createPayment($cart, $amount, $currency);
+
+        $apiKey = $this->gateway->data["api_key"];
+        $secretKey = $this->gateway->data["secret_key"];
+
+        $format_token = "{$apiKey}:{$secretKey}";
+
+        $url = "https://api-sbx.dlocalgo.com/v1/payments/";
+
+        $response = Http::withHeaders([
+            'Content-Type'=> 'application/json', 
+            'Authorization'=> "Bearer ${format_token}"
+        ])->post($url, [
+                'order_id' => $payment->id,
+                'amount' => $amount,
+                'currency' => $currency,
+                'country' => "CL",
+                'notification_url' => $notificationUrl,
+                "success_url" => $successUrl,
+                "back_url" => "https://mc.zgaming.net/shop/profile"
+            ]);
+
+        return redirect()->away($response["redirect_url"]);
     }
 
     public function notification(Request $request, ?string $rawPaymentId)

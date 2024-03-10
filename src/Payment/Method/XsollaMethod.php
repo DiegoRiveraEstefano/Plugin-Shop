@@ -58,6 +58,11 @@ class XsollaMethod extends PaymentMethod
         return redirect()->away("https://{$domain}/paystation2/?access_token={$token}");
     }
 
+    public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip)
+    {
+        return $this->startPayment($cart, $amount, $currency);
+    }
+
     public function notification(Request $request, ?string $paymentId)
     {
         $webhookServer = WebhookServer::create(function (Message $message) {

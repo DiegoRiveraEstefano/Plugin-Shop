@@ -67,6 +67,11 @@ class PaysafecardMethod extends PaymentMethod
         return redirect()->away($response['redirect']['auth_url']);
     }
 
+    public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip)
+    {
+        return $this->startPayment($cart, $amount, $currency);
+    }
+
     public function notification(Request $request, ?string $paymentId)
     {
         abort_if($paymentId === null, 404);

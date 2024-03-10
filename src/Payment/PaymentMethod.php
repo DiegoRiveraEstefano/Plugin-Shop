@@ -36,6 +36,8 @@ abstract class PaymentMethod
      */
     abstract public function startPayment(Cart $cart, float $amount, string $currency);
 
+    abstract public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip);
+
     /**
      * Handle a payment notification request.
      *

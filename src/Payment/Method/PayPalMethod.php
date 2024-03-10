@@ -49,6 +49,11 @@ class PayPalMethod extends PaymentMethod
 
         return redirect()->away('https://www.paypal.com/cgi-bin/webscr?'.Arr::query($attributes));
     }
+    
+    public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip)
+    {
+        return $this->startPayment($cart, $amount, $currency);
+    }
 
     public function notification(Request $request, ?string $rawPaymentId)
     {

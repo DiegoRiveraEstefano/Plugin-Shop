@@ -198,6 +198,17 @@
                         </div>
                     @endif
 
+                    <div class="form-group mb-4">
+                        <label for="country">Pais y Moneda</label>
+                        <select class="form-control" name="country">
+                            <option value="CL:CLP">CL - CLP</option>
+                            <option value="BR:BRL">BR - BRL</option>
+                            <option value="CL:CLP">CL - CLP</option>
+                            <option value="CL:CLP">CL - CLP</option>
+                            <option value="CL:CLP">CL - CLP</option>
+                        </select>
+                    </div>
+
                     <div class="d-flex">
                         <a href="{{ route('shop.home') }}" class="btn btn-secondary">
                             <i class="bi bi-arrow-left"></i> {{ trans('shop::messages.cart.back') }}

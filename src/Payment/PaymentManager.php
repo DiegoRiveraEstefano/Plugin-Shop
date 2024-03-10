@@ -38,7 +38,7 @@ class PaymentManager
             'stripe' => StripeMethod::class,
             'paymentwall' => PaymentWallMethod::class,
             'xsolla' => XsollaMethod::class,
-            'dlocal' => DLocalMethod::class,
+            'dlocalgo' => DLocalMethod::class
         ]);
     }
 

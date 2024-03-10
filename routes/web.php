@@ -60,6 +60,7 @@ Route::prefix('payments')->name('payments.')->group(function () {
     Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/payment', [PaymentController::class, 'payment'])->name('payment');
         Route::post('/{gateway:type}/pay', [PaymentController::class, 'pay'])->name('pay');
+
     });
 
     Route::get('/{gateway:type}/success', [PaymentController::class, 'success'])->name('success');

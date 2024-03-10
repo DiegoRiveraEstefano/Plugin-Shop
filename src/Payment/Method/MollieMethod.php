@@ -49,6 +49,11 @@ class MollieMethod extends PaymentMethod
         return redirect()->away($molliePayment->getCheckoutUrl());
     }
 
+    public function startPaymentWithIp(Cart $cart, float $amount, string $currency, string $ip)
+    {
+        return $this->startPayment($cart, $amount, $currency);
+    }
+
     public function notification(Request $request, ?string $paymentId)
     {
         $mollie = $this->createMollieClient();

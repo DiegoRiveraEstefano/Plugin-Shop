@@ -7,13 +7,13 @@ use Azuriom\Plugin\Shop\Cart\Cart;
 use Azuriom\Plugin\Shop\Models\Gateway;
 use Azuriom\Plugin\Shop\Payment\PaymentManager;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
 {
     public function payment(Request $request)
     {
         $cart = Cart::fromSession($request->session());
-
         // If the cart isn't empty and the total is 0, just complete
         // the payment now as gateways won't accept null payment
         if (! $cart->isEmpty() && $cart->total() < 0.1) {
@@ -32,16 +32,9 @@ class PaymentController extends Controller
                 }
 
                 return ! $gateway->paymentMethod()->hasFixedAmount();
-            });
-
-        // If there is only one payment gateway, redirect to it directly
-        if ($gateways->count() === 1) {
-            $gateway = $gateways->first();
-
-            return $gateway->paymentMethod()->startPayment($cart, $cart->total(), currency());
-        }
-
-        return view('shop::payments.pay', ['gateways' => $gateways]);
+            }); 
+            
+        return view('shop::payments.pay', ['gateways' => $gateways, "country" => $request->input('country')]);
     }
 
     /**
@@ -50,13 +43,14 @@ class PaymentController extends Controller
     public function pay(Request $request, Gateway $gateway)
     {
         abort_if(! $gateway->is_enabled, 403);
-
         $cart = Cart::fromSession($request->session());
 
         if ($cart->isEmpty()) {
             return to_route('shop.cart.index');
         }
-
+        if ($gateway["type"] === "dlocalgo"){
+            return $gateway->paymentMethod()->startPaymentWithCountry($cart, $cart->total(), currency(), $request->input('country'));
+        }
         return $gateway->paymentMethod()->startPayment($cart, $cart->total(), currency());
     }
 
