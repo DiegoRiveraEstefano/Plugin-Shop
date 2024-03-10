@@ -5,7 +5,6 @@ namespace Azuriom\Plugin\Shop\Payment\Method;
 use Azuriom\Plugin\Shop\Cart\Cart;
 use Azuriom\Plugin\Shop\Models\Payment;
 use Azuriom\Plugin\Shop\Payment\PaymentMethod;
-use Azuriom\Plugin\Shop\Payment\CurrenciesToCountries;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -30,26 +29,45 @@ class DlocalMethod extends PaymentMethod
     public function startPayment(Cart $cart, float $amount, string $currency)
     {
 
+        print("a");
+
         $successUrl = route('shop.payments.success', $this->id);
         $failureUrl = route('shop.payments.failure', $this->id);
         $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
 
+        print("b");
+
         $payment = $this->createPayment($cart, $amount, $currency);
 
+        print("c");
 
-        $response = $this->prepareRequest()->post('https://api-sbx.dlocalgo.com/v1/payments', [
+        $response = $this->prepareRequest()->post('', [
             'order_id' => $payment->id,
             'amount' => $amount,
             'currency' => $currency,
-            'country' => CurrenciesToCountries.countrieList[$currency],
+            'country' => 'CL',
             'notification_url' => $notificationUrl,
             "success_url" => $successUrl,
-            "back_url" => "https://mc.zgaming.net/shop/profile",
+            "back_url" => "https://mc.zgaming.net/shop/profile"
         ]);
 
-
+        print("d");
+        print($response);
 
         return redirect()->away($response["redirect_url"]);
+    }
+
+    private function prepareRequest(): PendingRequestss
+    {
+
+        echo(a1);
+        #$domain = $this->gateway->data['environment'] === 'production' ? 'api' : 'apitest';
+        $url = "https://api-sbx.dlocalgo.com/v1/payments/";
+        $token = base64_encode($this->gateway->data['api_key'] . ':' . $this->gateway->data['secrete_key']  );
+
+        echo($url);
+        echo($token);
+        return Http::withToken($token, 'Bearer')->baseUrl($url);
     }
 
     public function notification(Request $request, ?string $rawPaymentId)
@@ -115,13 +133,14 @@ class DlocalMethod extends PaymentMethod
 
     public function view(): string
     {
-        return 'shop::admin.gateways.methods.paypal';
+        return 'shop::admin.gateways.methods.dlocalgo';
     }
 
     public function rules(): array
     {
         return [
-            'email' => ['required', 'email'],
+            'api_key' => ['required'],
+            'secret_key' => ['required']
         ];
     }
 }
