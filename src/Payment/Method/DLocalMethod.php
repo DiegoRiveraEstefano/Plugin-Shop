@@ -18,7 +18,7 @@ class DlocalMethod extends PaymentMethod
      *
      * @var string
      */
-    protected $id = 'dlocal';
+    protected $id = 'dlocalgo';
 
     /**
      * The payment method display name.

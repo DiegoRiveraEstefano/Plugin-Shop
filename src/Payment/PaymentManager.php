@@ -14,6 +14,7 @@ use Azuriom\Plugin\Shop\Payment\Method\PayPalMethod;
 use Azuriom\Plugin\Shop\Payment\Method\PaysafecardMethod;
 use Azuriom\Plugin\Shop\Payment\Method\StripeMethod;
 use Azuriom\Plugin\Shop\Payment\Method\XsollaMethod;
+use Azuriom\Plugin\Shop\Payment\Method\DLocalMethod;
 use Illuminate\Support\Collection;
 
 class PaymentManager
@@ -37,6 +38,7 @@ class PaymentManager
             'stripe' => StripeMethod::class,
             'paymentwall' => PaymentWallMethod::class,
             'xsolla' => XsollaMethod::class,
+            'dlocal' => DLocalMethod::class,
         ]);
     }
 
