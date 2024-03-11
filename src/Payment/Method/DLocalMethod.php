@@ -35,7 +35,6 @@ class DlocalMethod extends PaymentMethod
         $successUrl = route('shop.payments.success', $this->id);
         $failureUrl = route('shop.payments.failure', $this->id);
         $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
-        $payment = $this->createPayment($cart, $amount, $currency);
 
         $formatedCountry = explode(":", $countryInput);
 
@@ -56,6 +55,10 @@ class DlocalMethod extends PaymentMethod
 
         $url = "https://api-sbx.dlocalgo.com/v1/payments/";
 
+        $payment = $this->createPayment($cart, $amount * $ratio, $currencySelected);
+
+        print(str_replace('%id%', '{payment_id}', $notificationUrl));
+
         $response = Http::withHeaders([
             'Content-Type'=> 'application/json', 
             'Authorization'=> "Bearer ${format_token}"
@@ -64,7 +67,7 @@ class DlocalMethod extends PaymentMethod
                 'amount' => $amount * $ratio,
                 'currency' => $currencySelected,
                 'country' => $country,
-                'notification_url' => $notificationUrl,
+                'notification_url' => str_replace('%id%', '{payment_id}', $notificationUrl),
                 "success_url" => $successUrl,
                 "back_url" => "https://mc.zgaming.net/shop/profile"
             ]);
@@ -149,60 +152,48 @@ class DlocalMethod extends PaymentMethod
 
     public function notification(Request $request, ?string $rawPaymentId)
     {
-        $data = ['cmd' => '_notify-validate'] + $request->all();
 
-        $response = Http::asForm()->post('https://ipnpb.paypal.com/cgi-bin/webscr', $data);
+        $apiKey = $this->gateway->data["api_key"];
+        $secretKey = $this->gateway->data["secret_key"];
 
-        if ($response->body() !== 'VERIFIED') {
-            return response()->json('Invalid response from PayPal', 401);
-        }
+        $format_token = "{$apiKey}:{$secretKey}";
 
-        $paymentId = $request->input('txn_id');
-        $amount = $request->input('mc_gross');
-        $currency = $request->input('mc_currency');
-        $status = $request->input('payment_status');
-        $caseType = $request->input('case_type');
-        $receiverEmail = Str::lower($request->input('receiver_email'));
+        $response = Http::withHeaders([ 
+            'Content-Type'=> 'application/json', 
+            'Authorization'=> "Bearer ${format_token}"
+        ]) 
+        ->get("https://api.dlocalgo.com/v1/payments/{$rawPaymentId}"); 
 
-        if ($status === 'Canceled_Reversal' || $caseType !== null) {
+        $paymentId = $request->input('id');
+        $amount = $request->input('amount');
+        $currency = $request->input('currency');
+        $country = $request->input('country');
+        $orderId = $request->input('order_id');
+        $status = $request->input('status');
+
+        if ($status === 'CANCELLED') {
             return response()->noContent();
         }
 
-        if ($status === 'Reversed') {
-            $parentTransactionId = $request->input('parent_txn_id');
+        $payment = Payment::findOrFail($orderId);
 
-            $payment = Payment::firstWhere('transaction_id', $parentTransactionId);
-
-            return $this->processChargeback($payment);
-        }
-
-        $payment = Payment::findOrFail($request->input('custom'));
-
-        if ($status === 'Pending') {
+        if ($status === 'PENDING') {
             $payment->update(['status' => 'pending', 'transaction_id' => $paymentId]);
             logger()->info('[Shop] Pending payment for #'.$paymentId);
 
             return response()->noContent();
         }
 
-        if ($status !== 'Completed') {
+        if ($status !== 'PAID') {
             logger()->warning("[Shop] Invalid payment status for #{$paymentId}: {$status}");
 
             return $this->invalidPayment($payment, $paymentId, 'Invalid status');
         }
 
-        if ($currency !== $payment->currency || $amount < $payment->price) {
+        if ($currency !== $payment->currency || $amount != $payment->price) {
             logger()->warning("[Shop] Invalid payment amount or currency for #{$paymentId}: {$amount} {$currency}.");
 
             return $this->invalidPayment($payment, $paymentId, 'Invalid amount/currency');
-        }
-
-        $email = Str::lower($this->gateway->data['email']);
-
-        if ($receiverEmail !== $email) {
-            logger()->warning("[Shop] Invalid email for #{$paymentId}: expected {$email} but got {$receiverEmail}.");
-
-            return $this->invalidPayment($payment, $paymentId, 'Invalid email');
         }
 
         return $this->processPayment($payment, $paymentId);
