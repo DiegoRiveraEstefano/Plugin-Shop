@@ -30,6 +30,7 @@ class PaymentManager
     public function __construct()
     {
         $this->paymentMethods = collect([
+            'dlocalgo' => DLocalMethod::class,
             'paypal' => PayPalMethod::class,
             'paypal-express-checkout' => PayPalExpressCheckout::class,
             'mollie' => MollieMethod::class,
@@ -38,7 +39,6 @@ class PaymentManager
             'stripe' => StripeMethod::class,
             'paymentwall' => PaymentWallMethod::class,
             'xsolla' => XsollaMethod::class,
-            'dlocalgo' => DLocalMethod::class
         ]);
     }
 

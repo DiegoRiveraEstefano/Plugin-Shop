@@ -32,9 +32,9 @@ class PaymentController extends Controller
                 }
 
                 return ! $gateway->paymentMethod()->hasFixedAmount();
-            }); 
+            });
             
-        return view('shop::payments.pay', ['gateways' => $gateways, "country" => $request->input('country')]);
+        return view('shop::payments.pay', ['gateways' => $gateways]);
     }
 
     /**
@@ -47,9 +47,6 @@ class PaymentController extends Controller
 
         if ($cart->isEmpty()) {
             return to_route('shop.cart.index');
-        }
-        if ($gateway["type"] === "dlocalgo"){
-            return $gateway->paymentMethod()->startPaymentWithCountry($cart, $cart->total(), currency(), $request->input('country'));
         }
         return $gateway->paymentMethod()->startPayment($cart, $cart->total(), currency());
     }

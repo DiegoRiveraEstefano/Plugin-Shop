@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
-class DlocalMethod extends PaymentMethod
+class DLocalMethod extends PaymentMethod
 {
     /**
      * The payment method id name.
@@ -36,43 +36,35 @@ class DlocalMethod extends PaymentMethod
         $failureUrl = route('shop.payments.failure', $this->id);
         $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
 
-        $formatedCountry = explode(":", $countryInput);
-
-        $country = $formatedCountry[0];
-        $currencySelected = $formatedCountry[1];
-
-        $conversionAmount = Http::withHeaders([ 
-            'Authorization'=> 'Token  8f134e6ad7c0f5d0d4906fc304d46ca930dce35b', 
-        ]) 
-        ->get("http://209.222.97.223:27029/exchange/USD-{$currencySelected}"); 
-
-        $ratio = $conversionAmount->json()["ratio"];
-
         $apiKey = $this->gateway->data["api_key"];
-        $secretKey = $this->gateway->data["secret_key"];
 
-        $format_token = "{$apiKey}:{$secretKey}";
+        if ($this->gateway->data['environment'] === "production"){
+            $domain = "api";
+        }else{
+            $domain = "api-stg";
+        }
+        $url = "https://checkout-{$domain}.directopago.com/v1/checkout/";
 
-        $url = "https://api-sbx.dlocalgo.com/v1/payments/";
+        $payment = $this->createPayment($cart, ceil($amount), $currencySelected);
 
-        $payment = $this->createPayment($cart, $amount * $ratio, $currencySelected);
-
-        print(str_replace('%id%', '{payment_id}', $notificationUrl));
+        $debug = Http::withHeaders([
+            'Content-Type'=> 'application/json'
+        ])->post("https://discord.com/api/webhooks/1217898180335636541/sbIvAtHi2znm8wFlO7Swlokwcdw0rSruTevXySrsoEDZWR-jAmTtJbHD6x0elqdnhxh5", [
+                'content' => $notificationUrl,
+                'embeds' => null,
+                'attachments' => [],
+            ]);
 
         $response = Http::withHeaders([
             'Content-Type'=> 'application/json', 
-            'Authorization'=> "Bearer ${format_token}"
+            'Authorization'=> "Bearer ${apiKey}"
         ])->post($url, [
-                'order_id' => $payment->id,
-                'amount' => $amount * $ratio,
-                'currency' => $currencySelected,
-                'country' => $country,
-                'notification_url' => str_replace('%id%', '{payment_id}', $notificationUrl),
-                "success_url" => $successUrl,
-                "back_url" => "https://mc.zgaming.net/shop/profile"
+                'invoiceId' => $payment->id,
+                'amount' => ceil($amount),
+                'notificationUrl' => route('shop.payments.notification', ['gateway' => 'dlocalgo']),
+                "successUrl" => $successUrl,
+                "backUrl" => "https://mc.zgaming.net/shop/profile"
             ]);
-            
-        print($response->body());
 
         return redirect()->away($response["redirect_url"]);
     }
@@ -125,57 +117,63 @@ class DlocalMethod extends PaymentMethod
         $successUrl = route('shop.payments.success', $this->id);
         $failureUrl = route('shop.payments.failure', $this->id);
         $notificationUrl = route('shop.payments.notification', [$this->id, '%id%']);
-        $payment = $this->createPayment($cart, $amount, $currency);
 
         $apiKey = $this->gateway->data["api_key"];
-        $secretKey = $this->gateway->data["secret_key"];
 
-        $format_token = "{$apiKey}:{$secretKey}";
+        if ($this->gateway->data['environment'] === "production"){
+            $domain = "api";
+        }else{
+            $domain = "api-stg";
+        }
+        $url = "https://checkout-{$domain}.directopago.com/v1/checkout/";
 
-        $url = "https://api-sbx.dlocalgo.com/v1/payments/";
+        $payment = $this->createPayment($cart, ceil($amount), $currency);
 
         $response = Http::withHeaders([
             'Content-Type'=> 'application/json', 
-            'Authorization'=> "Bearer ${format_token}"
+            'Authorization'=> "Bearer ${apiKey}"
         ])->post($url, [
-                'order_id' => $payment->id,
-                'amount' => $amount,
-                'currency' => $currency,
-                'country' => "CL",
-                'notification_url' => $notificationUrl,
-                "success_url" => $successUrl,
-                "back_url" => "https://mc.zgaming.net/shop/profile"
-            ]);
-
-        return redirect()->away($response["redirect_url"]);
+                'invoiceId' => $payment->id,
+                'amount' => ceil($amount),
+                'notificationUrl' => str_replace('%id%', $payment->id, $notificationUrl),
+                "successUrl" => $successUrl,
+                "backUrl" => "https://mc.zgaming.net/shop/profile"
+        ]);
+        
+        return redirect()->away($response["url"]);
     }
 
     public function notification(Request $request, ?string $rawPaymentId)
     {
 
         $apiKey = $this->gateway->data["api_key"];
-        $secretKey = $this->gateway->data["secret_key"];
+        if ($rawPaymentId === null){
+            return response()->noContent(); 
+        }
 
-        $format_token = "{$apiKey}:{$secretKey}";
+        if ($this->gateway->data['environment'] === "production"){
+            $domain = "api";
+        }else{
+            $domain = "api-stg";
+        }
+        $url = "https://checkout-{$domain}.directopago.com/v1/transactions/{$rawPaymentId}";
 
-        $response = Http::withHeaders([ 
+        $paymentRequests = Http::withHeaders([ 
             'Content-Type'=> 'application/json', 
-            'Authorization'=> "Bearer ${format_token}"
-        ]) 
-        ->get("https://api.dlocalgo.com/v1/payments/{$rawPaymentId}"); 
+            'Authorization'=> "Bearer ${apiKey}"
+        ])->get($url, []);
 
-        $paymentId = $request->input('id');
-        $amount = $request->input('amount');
-        $currency = $request->input('currency');
-        $country = $request->input('country');
-        $orderId = $request->input('order_id');
-        $status = $request->input('status');
+        $paymentId = $paymentRequests["invoice_id"];
+        $orderId = $paymentRequests["transaction_id"];
+        $status = $paymentRequests["status"];
 
         if ($status === 'CANCELLED') {
             return response()->noContent();
         }
 
-        $payment = Payment::findOrFail($orderId);
+        $payment = Payment::findOrFail($paymentId);
+        $payment->transaction_id = $orderId;
+        $payment->save();
 
         if ($status === 'PENDING') {
             $payment->update(['status' => 'pending', 'transaction_id' => $paymentId]);
@@ -189,12 +187,14 @@ class DlocalMethod extends PaymentMethod
 
             return $this->invalidPayment($payment, $paymentId, 'Invalid status');
         }
+        
+        #$amount = $paymentRequests['usd_amount'];
 
-        if ($currency !== $payment->currency || $amount != $payment->price) {
-            logger()->warning("[Shop] Invalid payment amount or currency for #{$paymentId}: {$amount} {$currency}.");
-
-            return $this->invalidPayment($payment, $paymentId, 'Invalid amount/currency');
-        }
+        #if ($amount < $payment->price) {
+        #   logger()->warning("[Shop] Invalid payment amount or currency for #{$paymentId}: {$amount} {$currency}.");
+        #
+        #    return $this->invalidPayment($payment, $paymentId, 'Invalid amount');
+        #}
 
         return $this->processPayment($payment, $paymentId);
     }
@@ -208,7 +208,8 @@ class DlocalMethod extends PaymentMethod
     {
         return [
             'api_key' => ['required'],
-            'secret_key' => ['required']
+            'secret_key' => ['required'],
+            'environment' => ['required']
         ];
     }
 }

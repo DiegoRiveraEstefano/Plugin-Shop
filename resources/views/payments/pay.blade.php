@@ -41,6 +41,5 @@
 
     <form method="POST" id="submitForm">
         @csrf
-        <input type="hidden" name="country" value="{{ $country }}">
     </form>
 @endsection
